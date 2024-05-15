@@ -1,0 +1,101 @@
+[package]
+edition = "2021"
+name = "esp-boot"
+version = "0.2.0"
+description = "Bootloader lib for ESP chips"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/embedevices/esp-boot"
+# documentation = "https://docs.embassy.dev/embassy-boot-rp"
+categories = [
+    "embedded",
+    "no-std",
+    "asynchronous",
+]
+
+# [package.metadata.embassy_docs]
+# src_base = "https://github.com/embassy-rs/embassy/blob/embassy-boot-rp-v$VERSION/src/"
+# src_base_git = "https://github.com/embassy-rs/embassy/blob/$COMMIT/embassy-boot-rp/src/"
+# target = "thumbv6m-none-eabi"
+
+[lib]
+
+[dependencies]
+defmt = { version = "0.3", optional = true }
+defmt-rtt = { version = "0.4", optional = true }
+log = { version = "0.4", optional = true }
+
+embassy-sync = { version = "0.5.0" }
+embassy-rp = { version = "0.1.0", default-features = false }
+embassy-boot = { version = "0.2.0" }
+embassy-time = { version = "0.3.0" }
+esp-hal = { version = "0.17.0", features = ["async"] }
+esp-println = "0.9.1"
+esp-backtrace = { version = "0.11.1", features = [
+    "panic-handler",
+    "exception-handler",
+    "println",
+] }
+
+# espflash = { version = "3.0.0", default-features = false }
+
+
+cortex-m = { version = "0.7.6" }
+cortex-m-rt = { version = "0.7" }
+embedded-storage = "0.3.1"
+embedded-storage-async = { version = "0.4.1" }
+cfg-if = "1.0.0"
+esp-storage = { version = "0.3.0", features = ["low-level", "nor-flash"] }
+
+[features]
+defmt = [
+    "dep:defmt",
+    "embassy-boot/defmt",
+    "esp-hal/defmt",
+]
+
+log = [
+    "dep:log",
+    "embassy-boot/log",
+    "esp-hal/log",
+]
+
+debug = ["defmt-rtt"]
+
+esp32c2 = [ "esp-hal/esp32c2", "esp-println/esp32c2", "esp-backtrace/esp32c2", "esp-storage/esp32c2" ]
+esp32c3 = [ "esp-hal/esp32c3", "esp-println/esp32c3", "esp-backtrace/esp32c3", "esp-storage/esp32c3" ]
+esp32c6 = [ "esp-hal/esp32c6", "esp-println/esp32c6", "esp-backtrace/esp32c6", "esp-storage/esp32c6" ]
+esp32h2 = [ "esp-hal/esp32h2", "esp-println/esp32h2", "esp-backtrace/esp32h2", "esp-storage/esp32h2" ]
+esp32   = [   "esp-hal/esp32", "esp-println/esp32",     "esp-backtrace/esp32", "esp-storage/esp32" ]
+esp32s2 = [ "esp-hal/esp32s2", "esp-println/esp32s2", "esp-backtrace/esp32s2", "esp-storage/esp32s2" ]
+esp32s3 = [ "esp-hal/esp32s3", "esp-println/esp32s3", "esp-backtrace/esp32s3", "esp-storage/esp32s3" ]
+
+[profile.dev]
+debug = 2
+debug-assertions = true
+incremental = false
+opt-level = 'z'
+overflow-checks = true
+
+[profile.release]
+codegen-units = 1
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 'z'
+overflow-checks = false
+
+# do not optimize proc-macro crates = faster builds from scratch
+[profile.dev.build-override]
+codegen-units = 8
+debug = false
+debug-assertions = false
+opt-level = 0
+overflow-checks = false
+
+[profile.release.build-override]
+codegen-units = 8
+debug = false
+debug-assertions = false
+opt-level = 0
+overflow-checks = false
