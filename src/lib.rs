@@ -11,16 +11,21 @@ use embassy_rp::flash::{Blocking, Flash};
 use embassy_rp::peripherals::{FLASH, WATCHDOG};
 use embassy_rp::watchdog::Watchdog;
 
+use esp_hal::delay::MicrosDurationU64;
+use esp_hal::timer::Wdt;
+use esp_storage::FlashStorage;
+
 use embassy_rp::Peripheral;
 use embassy_time::Duration;
 use embedded_storage::nor_flash::{ErrorType, NorFlash, ReadNorFlash};
 
 use esp_hal::prelude::*;
 
+use esp_hal::timer::TimerGroupInstance;
 
 
 /// A bootloader for ESP devices.
-pub struct BootLoader<const BUFFER_SIZE: usize = 4096>;
+pub struct BootLoader<const BUFFER_SIZE: usize = {FlashStorage::SECTOR_SIZE as usize}>;
 
 impl<const BUFFER_SIZE: usize> BootLoader<BUFFER_SIZE> {
     /// Inspect the bootloader state and perform actions required before booting, such as swapping firmware
@@ -48,57 +53,68 @@ impl<const BUFFER_SIZE: usize> BootLoader<BUFFER_SIZE> {
     pub unsafe fn load(self, start: u32) -> ! {
         trace!("Loading app at 0x{:x}", start);
         // #[allow(unused_mut)]
-        // let mut p = cortex_m::Peripherals::steal();
+        let mut b = cortex_m::Peripherals::steal();
         #[allow(unused_mut)]
-        let mut p = Peripherals::take();
-        #[cfg(not(armv6m))]
-        p.SCB.invalidate_icache();
-        p.SCB.vtor.write(start);
+        let mut p = esp_hal::peripherals::Peripherals::take();
+        // #[cfg(not(armv6m))]
+        b.SCB.invalidate_icache();
 
+        b.SCB.vtor.write(start);
+
+        // esp_hal::reset::software_reset();
         
         cortex_m::asm::bootload(start as *const u32)
     }
 }
 
 /// A flash implementation that will feed a watchdog when touching flash.
-pub struct WatchdogFlash<'d, const SIZE: usize> {
-    flash: Flash<'d, FLASH, Blocking, SIZE>,
-    watchdog: Watchdog,
+pub struct WatchdogFlash<TG: TimerGroupInstance> {
+    // flash: Flash<'d, FLASH, Blocking, SIZE>,
+    flash: FlashStorage,
+    watchdog: Wdt<TG, esp_hal::Blocking>,
 }
 
-impl<'d, const SIZE: usize> WatchdogFlash<'d, SIZE> {
+impl<TG: TimerGroupInstance> WatchdogFlash<TG> {
     /// Start a new watchdog with a given flash and watchdog peripheral and a timeout
-    pub fn start(flash: FLASH, watchdog: WATCHDOG, timeout: Duration) -> Self {
-        let flash = Flash::<_, Blocking, SIZE>::new_blocking(flash);
-        let mut watchdog = Watchdog::new(watchdog);
-        watchdog.start(timeout);
+    pub fn start(watchdog_tg: TG, timeout: Duration) -> Self {
+        // let flash = Flash::<_, Blocking, SIZE>::new_blocking(flash);
+
+        let flash = FlashStorage::new();
+
+        let mut watchdog = Wdt::<TG, esp_hal::Blocking>::new();
+
+        watchdog.set_timeout(MicrosDurationU64::from_ticks(timeout.as_ticks()));
+        watchdog.enable();
+
+        // let mut watchdog = Watchdog::new(watchdog);
+        // watchdog.start(timeout);
         Self { flash, watchdog }
     }
 }
 
-impl<'d, const SIZE: usize> ErrorType for WatchdogFlash<'d, SIZE> {
-    type Error = <Flash<'d, FLASH, Blocking, SIZE> as ErrorType>::Error;
+impl<TG: TimerGroupInstance> ErrorType for WatchdogFlash<TG> {
+    type Error = <FlashStorage as ErrorType>::Error;
 }
 
-impl<'d, const SIZE: usize> NorFlash for WatchdogFlash<'d, SIZE> {
-    const WRITE_SIZE: usize = <Flash<'d, FLASH, Blocking, SIZE> as NorFlash>::WRITE_SIZE;
-    const ERASE_SIZE: usize = <Flash<'d, FLASH, Blocking, SIZE> as NorFlash>::ERASE_SIZE;
+impl<TG: TimerGroupInstance> NorFlash for WatchdogFlash<TG> {
+    const WRITE_SIZE: usize = <FlashStorage as NorFlash>::WRITE_SIZE;
+    const ERASE_SIZE: usize = <FlashStorage as NorFlash>::ERASE_SIZE;
 
     fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
         self.watchdog.feed();
-        self.flash.blocking_erase(from, to)
+        self.flash.erase(from, to)
     }
     fn write(&mut self, offset: u32, data: &[u8]) -> Result<(), Self::Error> {
         self.watchdog.feed();
-        self.flash.blocking_write(offset, data)
+        self.flash.write(offset, data)
     }
 }
 
-impl<'d, const SIZE: usize> ReadNorFlash for WatchdogFlash<'d, SIZE> {
-    const READ_SIZE: usize = <Flash<'d, FLASH, Blocking, SIZE> as ReadNorFlash>::READ_SIZE;
+impl<TG: TimerGroupInstance> ReadNorFlash for WatchdogFlash<TG> {
+    const READ_SIZE: usize = <FlashStorage as ReadNorFlash>::READ_SIZE;
     fn read(&mut self, offset: u32, data: &mut [u8]) -> Result<(), Self::Error> {
         self.watchdog.feed();
-        self.flash.blocking_read(offset, data)
+        self.flash.read(offset, data)
     }
     fn capacity(&self) -> usize {
         self.flash.capacity()
