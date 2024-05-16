@@ -39,26 +39,36 @@ impl<const BUFFER_SIZE: usize> BootLoader<BUFFER_SIZE> {
         Ok(Self)
     }
 
-    /// Boots the application.
-    ///
-    /// # Safety
-    ///
-    /// This modifies the stack pointer and reset vector and will run code placed in the active partition.
-    pub unsafe fn load(self, start: u32) -> ! {
-        trace!("Loading app at 0x{:x}", start);
-        // #[allow(unused_mut)]
-        let mut b = cortex_m::Peripherals::steal();
-        #[allow(unused_mut)]
-        let mut _p = esp_hal::peripherals::Peripherals::take();
-        // #[cfg(not(armv6m))]
-        b.SCB.invalidate_icache();
+    // /// Boots the application.
+    // ///
+    // /// # Safety
+    // ///
+    // /// This modifies the stack pointer and reset vector and will run code placed in the active partition.
+    // pub unsafe fn load(self, start: u32) -> ! {
+    //     trace!("Loading app at 0x{:x}", start);
+    //     // #[allow(unused_mut)]
+    //     let mut b = cortex_m::Peripherals::steal();
+    //     #[allow(unused_mut)]
+    //     let mut _p = esp_hal::peripherals::Peripherals::take();
+    //     // #[cfg(not(armv6m))]
+    //     b.SCB.invalidate_icache();
 
-        b.SCB.vtor.write(start);
+    //     #[cfg(not(target_arch="xtensa"))]
+    //     compile_error!("This crate only supports xtensa architectures currently!");
 
-        // esp_hal::reset::software_reset();
-        
-        cortex_m::asm::bootload(start as *const u32)
-    }
+
+    //     // #[cfg(target_arch="xtensa")]
+    //     xtensa_lx::set_vecbase(start as *const u32);
+
+    //     // b.SCB.vtor.write(start);
+
+
+    //     xtensa_lx::set_stack_pointer(start as *mut u32);
+
+    //     esp_hal::reset::software_reset();
+
+    //     cortex_m::asm::bootload(start as *const u32)
+    // }
 }
 
 /// A flash implementation that will feed a watchdog when touching flash.
