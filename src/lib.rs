@@ -7,19 +7,13 @@ pub use embassy_boot::{
     AlignedBuffer, BlockingFirmwareState, BlockingFirmwareUpdater, BootError, BootLoaderConfig, FirmwareState,
     FirmwareUpdater, FirmwareUpdaterConfig, State,
 };
-use embassy_rp::flash::{Blocking, Flash};
-use embassy_rp::peripherals::{FLASH, WATCHDOG};
-use embassy_rp::watchdog::Watchdog;
 
 use esp_hal::delay::MicrosDurationU64;
 use esp_hal::timer::Wdt;
 use esp_storage::FlashStorage;
 
-use embassy_rp::Peripheral;
 use embassy_time::Duration;
 use embedded_storage::nor_flash::{ErrorType, NorFlash, ReadNorFlash};
-
-use esp_hal::prelude::*;
 
 use esp_hal::timer::TimerGroupInstance;
 
@@ -55,7 +49,7 @@ impl<const BUFFER_SIZE: usize> BootLoader<BUFFER_SIZE> {
         // #[allow(unused_mut)]
         let mut b = cortex_m::Peripherals::steal();
         #[allow(unused_mut)]
-        let mut p = esp_hal::peripherals::Peripherals::take();
+        let mut _p = esp_hal::peripherals::Peripherals::take();
         // #[cfg(not(armv6m))]
         b.SCB.invalidate_icache();
 
@@ -76,9 +70,7 @@ pub struct WatchdogFlash<TG: TimerGroupInstance> {
 
 impl<TG: TimerGroupInstance> WatchdogFlash<TG> {
     /// Start a new watchdog with a given flash and watchdog peripheral and a timeout
-    pub fn start(watchdog_tg: TG, timeout: Duration) -> Self {
-        // let flash = Flash::<_, Blocking, SIZE>::new_blocking(flash);
-
+    pub fn start(timeout: Duration) -> Self {
         let flash = FlashStorage::new();
 
         let mut watchdog = Wdt::<TG, esp_hal::Blocking>::new();
@@ -86,8 +78,6 @@ impl<TG: TimerGroupInstance> WatchdogFlash<TG> {
         watchdog.set_timeout(MicrosDurationU64::from_ticks(timeout.as_ticks()));
         watchdog.enable();
 
-        // let mut watchdog = Watchdog::new(watchdog);
-        // watchdog.start(timeout);
         Self { flash, watchdog }
     }
 }
