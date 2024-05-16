@@ -112,7 +112,3 @@ impl PartialOrd for Version4 {
         self.3.partial_cmp(&other.3)
     }
 }
-
-fn print_warning(message: impl core::fmt::Display) {
-    println!("cargo:warning={}", message);
-}
